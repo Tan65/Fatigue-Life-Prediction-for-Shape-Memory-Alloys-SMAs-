@@ -1,0 +1,76 @@
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+import matplotlib.pyplot as plt
+
+# Step 1: Simulate synthetic dataset for SMAs
+np.random.seed(42)
+
+n_samples = 300
+
+# Random features
+alloy_types = ['Nitinol', 'Cu-Al-Ni', 'Fe-Mn-Si', 'Ti-Ni-Co']
+alloy = np.random.choice(alloy_types, n_samples)
+
+transformation_temp = np.random.uniform(50, 250, n_samples)  # in Celsius
+applied_stress = np.random.uniform(100, 600, n_samples)      # in MPa
+
+# Create alloy-specific effect
+alloy_effect = {
+    'Nitinol': 1.0,
+    'Cu-Al-Ni': 0.8,
+    'Fe-Mn-Si': 0.7,
+    'Ti-Ni-Co': 0.9
+}
+
+# Generate fatigue life (random but influenced by properties)
+fatigue_life = (
+    1e5 * np.array([alloy_effect[a] for a in alloy]) *
+    (300 - transformation_temp) / 250 *
+    (600 - applied_stress) / 500
+) + np.random.normal(0, 5000, n_samples)  # Adding small noise
+
+# Make sure fatigue life is positive
+fatigue_life = np.clip(fatigue_life, 1000, None)
+
+# Step 2: Create DataFrame
+data = pd.DataFrame({
+    'Alloy': alloy,
+    'Transformation Temperature (°C)': transformation_temp,
+    'Applied Stress (MPa)': applied_stress,
+    'Fatigue Life (cycles)': fatigue_life
+})
+
+print(data.head())
+
+# Step 3: Prepare features
+# One-hot encode the 'Alloy' categorical feature
+data_encoded = pd.get_dummies(data, columns=['Alloy'])
+
+X = data_encoded.drop('Fatigue Life (cycles)', axis=1)
+y = data_encoded['Fatigue Life (cycles)']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Step 4: Train ML Model
+model = RandomForestRegressor(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+# Step 5: Predict and evaluate
+y_pred = model.predict(X_test)
+
+print("\nModel Performance:")
+print(f"Mean Squared Error: {mean_squared_error(y_test, y_pred):.2f}")
+print(f"R² Score: {r2_score(y_test, y_pred):.4f}")
+
+# Step 6: Plot actual vs predicted
+plt.figure(figsize=(8,5))
+plt.scatter(y_test, y_pred, alpha=0.7)
+plt.xlabel('Actual Fatigue Life (cycles)')
+plt.ylabel('Predicted Fatigue Life (cycles)')
+plt.title('Fatigue Life Prediction for SMAs')
+plt.grid(True)
+plt.plot([min(y_test), max(y_test)], [min(y_test), max(y_test)], 'r--')  # Line y=x
+plt.show()
